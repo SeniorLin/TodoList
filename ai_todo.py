@@ -165,9 +165,30 @@ class TaskItem(QWidget):
                 }
             """)
     
-    def delete_task(self):
-        self.deleted.emit(self.listWidgetItem)
+    def delete_task(self, item):
+        row = self.task_list.row(item)
+        widget = self.task_list.itemWidget(item)
+        task_id = widget.task_id
         
+        # 更新任务状态为隐藏
+        for task in self.tasks_data["tasks"]:
+            if task["id"] == task_id:
+                task["hidden"] = True
+                task["updated_at"] = self.get_current_time()
+                break
+        
+        # 从列表中移除显示
+        self.task_list.takeItem(row)
+        
+        # 清除当前选中状态
+        if self.current_task == item:
+            self.current_task = None
+            self.subtasks_list.clear()
+            self.task_info_area.clear()
+        
+        # 保存更改
+        self.save_tasks()
+    
     def on_checkbox_changed(self, state):
         """复选框状态改变时触发"""
         is_checked = bool(state)  # 直接转换为布尔值，因为我们只关心是否选中
@@ -420,29 +441,6 @@ class AITodoApp(QMainWindow):
             self.task_input.clear()
             self.save_tasks()
     
-    def delete_task(self, item):
-        row = self.task_list.row(item)
-        widget = self.task_list.itemWidget(item)
-        task_id = widget.task_id
-        
-        # 更新任务状态为隐藏
-        for task in self.tasks_data["tasks"]:
-            if task["id"] == task_id:
-                task["hidden"] = True
-                task["updated_at"] = self.get_current_time()
-                break
-        
-        # 从列表中移除显示
-        self.task_list.takeItem(row)
-        
-        # 清除当前选中状态
-        if self.current_task == item:
-            self.current_task = None
-            self.subtasks_area.clear()
-        
-        # 保存更改
-        self.save_tasks()
-    
     def edit_task(self, item, new_text):
         widget = self.task_list.itemWidget(item)
         if widget:
@@ -458,25 +456,37 @@ class AITodoApp(QMainWindow):
     def update_task_status(self, item, is_checked):
         widget = self.task_list.itemWidget(item)
         if widget:
-            # 更新UI样式
-            widget.update_style(is_checked)
-
-            # 更新任务状态
             task_id = widget.task_id
+            current_time = self.get_current_time()
+            
             for task in self.tasks_data["tasks"]:
                 if task["id"] == task_id:
+                    # 更新主任务状态
                     task["completed"] = is_checked
-                    task["updated_at"] = self.get_current_time()
+                    task["updated_at"] = current_time
+                    
+                    # 同步更新所有未隐藏的子任务状态
+                    for subtask in task.get("subtasks", []):
+                        if not subtask.get("hidden", False):
+                            subtask["completed"] = is_checked
+                            subtask["updated_at"] = current_time
+                    
+                    # 更新主任务UI
+                    widget.checkbox.setChecked(is_checked)
+                    widget.update_style(is_checked)
+                    
+                    # 如果当前正在显示这个任务的子任务，更新子任务显示
+                    if self.current_task == item:
+                        # 保存当前的信息文本
+                        current_info = self.task_info_area.toPlainText()
+                        self.show_subtasks(item)  # 这会刷新子任务显示
+                        # 恢复信息文本，但更新修改时间
+                        info_lines = current_info.split('\n')
+                        if len(info_lines) >= 3:
+                            info_lines[2] = f"修改时间：{current_time}"
+                        self.task_info_area.setText('\n'.join(info_lines))
                     break
             
-            # 强制刷新列表项
-            self.task_list.update(self.task_list.indexFromItem(item))
-            
-            # 更新子任务显示
-            if self.current_task == item:
-                self.show_subtasks(item)
-            
-            # 保存更改
             self.save_tasks()
     
     def show_context_menu(self, position):
@@ -678,22 +688,42 @@ class AITodoApp(QMainWindow):
             task_widget = self.task_list.itemWidget(self.current_task)
             task_id = task_widget.task_id
             subtask_id = subtask_widget.task_id
+            current_time = self.get_current_time()
             
             # 更新数据结构中的状态
             for task in self.tasks_data["tasks"]:
                 if task["id"] == task_id:
+                    # 更新子任务状态
                     for subtask in task["subtasks"]:
                         if subtask["id"] == subtask_id:
                             subtask["completed"] = is_checked
-                            subtask["updated_at"] = self.get_current_time()
+                            subtask["updated_at"] = current_time
                             break
-                    task["updated_at"] = self.get_current_time()
+                    
+                    # 检查所有未隐藏的子任务状态
+                    visible_subtasks = [s for s in task["subtasks"] if not s.get("hidden", False)]
+                    all_completed = bool(visible_subtasks and all(s.get("completed", False) for s in visible_subtasks))
+                    print(all_completed)
+                    # 更新主任务状态
+                    task["completed"] = all_completed
+                    task["updated_at"] = current_time
+                    
+                    # 更新主任务UI
+                    task_widget.checkbox.setChecked(all_completed)
+                    task_widget.update_style(all_completed)
+                    
+                    # 更新任务信息显示
+                    current_info = self.task_info_area.toPlainText()
+                    info_lines = current_info.split('\n')
+                    if len(info_lines) >= 3:
+                        info_lines[2] = f"修改时间：{current_time}"
+                    self.task_info_area.setText('\n'.join(info_lines))
                     break
             
-            # 更新UI显示
+            # 更新子任务UI
             subtask_widget.update_style(is_checked)
             self.save_tasks()
-            self.update_task_info()
+            self.show_subtasks(self.current_task)
 
     def delete_subtask(self, item):
         """删除（隐藏）子任务"""
@@ -749,6 +779,7 @@ class AITodoApp(QMainWindow):
             subtask_widget.text_label.setText(new_text)
             subtask_widget.update_style(subtask_widget.checkbox.isChecked())
             self.save_tasks()
+            self.show_subtasks(self.current_task)
 
     def clean_data_for_save(self):
         """清理数据，确保只保存基本数据类型"""
