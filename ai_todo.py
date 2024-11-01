@@ -444,12 +444,17 @@ class AITodoApp(QMainWindow):
                     # 更新主任务状态
                     task["completed"] = is_checked
                     task["updated_at"] = current_time
+
+                    # 检查所有未隐藏的子任务状态
+                    visible_subtasks = [s for s in task["subtasks"] if not s.get("hidden", False)]
+                    all_completed = bool(visible_subtasks and all(s.get("completed", False) for s in visible_subtasks))
                     
-                    # 同步更新所有未隐藏的子任务状态
-                    for subtask in task.get("subtasks", []):
-                        if not subtask.get("hidden", False):
-                            subtask["completed"] = is_checked
-                            subtask["updated_at"] = current_time
+                    if is_checked or all_completed:
+                        # 同步更新所有未隐藏的子任务状态
+                        for subtask in task.get("subtasks", []):
+                            if not subtask.get("hidden", False):
+                                subtask["completed"] = is_checked
+                                subtask["updated_at"] = current_time
                     
                     # 更新主任务UI
                     widget.checkbox.setChecked(is_checked)
@@ -683,7 +688,7 @@ class AITodoApp(QMainWindow):
                     # 检查所有未隐藏的子任务状态
                     visible_subtasks = [s for s in task["subtasks"] if not s.get("hidden", False)]
                     all_completed = bool(visible_subtasks and all(s.get("completed", False) for s in visible_subtasks))
-                    print(all_completed)
+                    
                     # 更新主任务状态
                     task["completed"] = all_completed
                     task["updated_at"] = current_time
