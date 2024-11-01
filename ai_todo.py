@@ -207,7 +207,7 @@ class AITodoApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("AI Todo List")
-        self.setGeometry(100, 100, 1000, 600)
+        self.setGeometry(100, 100, 1200, 800)
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #f0f0f0;
@@ -264,7 +264,7 @@ class AITodoApp(QMainWindow):
         
         self.task_input = QLineEdit()
         self.task_input.setPlaceholderText("输入新任务...")
-        self.add_button = QPushButton("添加任务")
+        self.add_button = QPushButton("添加")
         self.add_button.clicked.connect(self.add_task)
         
         self.task_list = QListWidget()
@@ -301,8 +301,12 @@ class AITodoApp(QMainWindow):
             }
         """)
         
-        left_layout.addWidget(self.task_input)
-        left_layout.addWidget(self.add_button)
+        # Adjust the layout to display task_input and add_button horizontally
+        task_input_layout = QHBoxLayout()
+        task_input_layout.addWidget(self.task_input)
+        task_input_layout.addWidget(self.add_button)
+        left_layout.addLayout(task_input_layout)
+        
         left_layout.addWidget(self.task_list)
         
         # 右侧布局：子任务详情
@@ -312,7 +316,7 @@ class AITodoApp(QMainWindow):
         # 任务信息区域
         self.task_info_area = QTextEdit()
         self.task_info_area.setReadOnly(True)
-        self.task_info_area.setMaximumHeight(100)
+        self.task_info_area.setMaximumHeight(56)
         self.task_info_area.setStyleSheet("""
             QTextEdit {
                 border: 1px solid #ddd;
@@ -500,8 +504,8 @@ class AITodoApp(QMainWindow):
         
         if task_data:
             # 显示任务信息
-            info_text = (f"任务：{task_data['text']}\n"
-                        f"创建时间：{task_data['created_at']}\n"
+            info_text = (f"任务名称：{task_data['text']}\n"
+                        f"创建时间：{task_data['created_at']}\t"
                         f"修改时间：{task_data['updated_at']}")
             self.task_info_area.setText(info_text)
             
