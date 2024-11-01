@@ -165,29 +165,9 @@ class TaskItem(QWidget):
                 }
             """)
     
-    def delete_task(self, item):
-        row = self.task_list.row(item)
-        widget = self.task_list.itemWidget(item)
-        task_id = widget.task_id
-        
-        # 更新任务状态为隐藏
-        for task in self.tasks_data["tasks"]:
-            if task["id"] == task_id:
-                task["hidden"] = True
-                task["updated_at"] = self.get_current_time()
-                break
-        
-        # 从列表中移除显示
-        self.task_list.takeItem(row)
-        
-        # 清除当前选中状态
-        if self.current_task == item:
-            self.current_task = None
-            self.subtasks_list.clear()
-            self.task_info_area.clear()
-        
-        # 保存更改
-        self.save_tasks()
+    def delete_task(self):
+        """发送删除信号"""
+        self.deleted.emit(self.listWidgetItem)
     
     def on_checkbox_changed(self, state):
         """复选框状态改变时触发"""
@@ -592,7 +572,7 @@ class AITodoApp(QMainWindow):
                 }
                 new_subtasks.append(subtask_data)
             
-            # 合并现有子任务和新子任务
+            # 合并���有子任务和���子任务
             updated_subtasks = existing_subtasks + new_subtasks if existing_subtasks else new_subtasks
             
             # 更新数据和显示
@@ -782,7 +762,7 @@ class AITodoApp(QMainWindow):
             self.show_subtasks(self.current_task)
 
     def clean_data_for_save(self):
-        """清理数据，确保只保存基本数据类型"""
+        """清理数据，确保只保存基本数据类���"""
         clean_tasks = []
         for task in self.tasks_data["tasks"]:
             clean_task = {
@@ -822,6 +802,31 @@ class AITodoApp(QMainWindow):
                             f"创建时间：{task_data['created_at']}\t"
                             f"修改时间：{task_data['updated_at']}")
                 self.task_info_area.setText(info_text)
+
+    def delete_task(self, item):
+        """处理任务删除"""
+        row = self.task_list.row(item)
+        widget = self.task_list.itemWidget(item)
+        task_id = widget.task_id
+        
+        # 更新任务状态为隐藏
+        for task in self.tasks_data["tasks"]:
+            if task["id"] == task_id:
+                task["hidden"] = True
+                task["updated_at"] = self.get_current_time()
+                break
+        
+        # 从列表中移除显示
+        self.task_list.takeItem(row)
+        
+        # 清除当前选中状态
+        if self.current_task == item:
+            self.current_task = None
+            self.subtasks_list.clear()
+            self.task_info_area.clear()
+        
+        # 保存更改
+        self.save_tasks()
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
