@@ -787,8 +787,8 @@ class AITodoApp(QMainWindow):
             task_data = next((t for t in self.tasks_data["tasks"] if t["id"] == task_id), None)
             
             if task_data:
-                info_text = (f"任务：{task_data['text']}\n"
-                            f"创建时间：{task_data['created_at']}\n"
+                info_text = (f"任务名称：{task_data['text']}\n"
+                            f"创建时间：{task_data['created_at']}\t"
                             f"修改时间：{task_data['updated_at']}")
                 self.task_info_area.setText(info_text)
 
