@@ -110,6 +110,10 @@ class TaskItem(QWidget):
         layout.addWidget(button_container, 0)
         
         self.setFixedHeight(32)
+        
+        # 添加回车事件处理
+        self.text_label.returnPressed.connect(self.finish_edit)
+        self.original_text = text  # 保存原始文本
     
     def toggle_edit(self):
         if self.text_label.isReadOnly():
@@ -189,10 +193,22 @@ class TaskItem(QWidget):
         super(QLineEdit, self.text_label).focusOutEvent(event)
     
     def finish_edit(self):
+        """处理回车事件和编辑完成"""
         if not self.text_label.isReadOnly():
-            self.toggle_edit()
+            new_text = self.text_label.text().strip()
+            if new_text and new_text != self.original_text:
+                self.text_label.setReadOnly(True)
+                self.update_style(self.checkbox.isChecked())
+                # 发送编辑信号
+                self.edited.emit(self.listWidgetItem, new_text)
+            else:
+                # 如果文本为空或未改变，恢复原始文本
+                self.text_label.setText(self.original_text)
+                self.text_label.setReadOnly(True)
+                self.update_style(self.checkbox.isChecked())
     
     def edit_task(self, item, new_text):
+        """处理任务编辑"""
         widget = self.task_list.itemWidget(item)
         if widget:
             # 更新任务文本和修改时间
@@ -427,10 +443,26 @@ class AITodoApp(QMainWindow):
             # 更新任务文本和修改时间
             for task in self.tasks_data["tasks"]:
                 if task["id"] == widget.task_id:
+                    current_time = self.get_current_time()
                     task["text"] = new_text
-                    task["updated_at"] = self.get_current_time()
+                    task["updated_at"] = current_time
+                    
+                    # 如果当前正在显示这个任务，更新任务信息
+                    if self.current_task == item:
+                        # 保持原有格式，只更新任务名称和修改时间
+                        current_info = self.task_info_area.toPlainText()
+                        info_lines = current_info.split('\n')
+                        info_lines[0] = f"任务名称：{new_text}"
+                        if len(info_lines) >= 3:
+                            info_lines[2] = f"修改时间：{current_time}"
+                        self.task_info_area.setText('\n'.join(info_lines))
                     break
+            
+            # 更新UI
             widget.text_label.setText(new_text)
+            widget.original_text = new_text  # 更新原始文本
+            
+            # 保存更改
             self.save_tasks()
     
     def update_task_status(self, item, is_checked):
@@ -577,7 +609,7 @@ class AITodoApp(QMainWindow):
                 }
                 new_subtasks.append(subtask_data)
             
-            # 合并���有子任务和���子任务
+            # 合并有子任务和子任务
             updated_subtasks = existing_subtasks + new_subtasks if existing_subtasks else new_subtasks
             
             # 更新数据和显示
@@ -767,7 +799,7 @@ class AITodoApp(QMainWindow):
             self.show_subtasks(self.current_task)
 
     def clean_data_for_save(self):
-        """清理数据，确保只保存基本数据类���"""
+        """清理数据，确保只保存基本数据类"""
         clean_tasks = []
         for task in self.tasks_data["tasks"]:
             clean_task = {
