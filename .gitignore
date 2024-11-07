@@ -40,6 +40,7 @@ ENV/
 *.log
 *.db
 *.sqlite3
+tasks.json
 
 # Distribution / packaging
 .Python

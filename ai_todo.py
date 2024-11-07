@@ -492,7 +492,7 @@ class AITodoApp(QMainWindow):
                     widget.checkbox.setChecked(is_checked)
                     widget.update_style(is_checked)
                     
-                    # 如果当前正在显示这个任务的子任务，更新子任务显示
+                    # 如果当前正在显示这个任务的子任务，更新子任务显���
                     if self.current_task == item:
                         # 保存当前的信息文本
                         current_info = self.task_info_area.toPlainText()
@@ -562,11 +562,7 @@ class AITodoApp(QMainWindow):
             
         task_widget = self.task_list.itemWidget(self.current_task)
         task_text = task_widget.text_label.text()
-        
-        # 获取当前任务的现有子任务
         task_id = task_widget.task_id
-        task_data = next((t for t in self.tasks_data["tasks"] if t["id"] == task_id), None)
-        existing_subtasks = task_data.get("subtasks", []) if task_data else []
         
         try:
             # 调用DeepSeek API
@@ -593,31 +589,31 @@ class AITodoApp(QMainWindow):
             )
             response.raise_for_status()
             result = response.json()
-            subtasks = result['choices'][0]['message']['content']
+            subtasks_text = result['choices'][0]['message']['content']
             
-            # 解析新生成的子任务，并转换为正确的数据结构
+            # 解析子任务文本
             current_time = self.get_current_time()
-            new_subtasks = []
-            for subtask_text in [s.strip() for s in subtasks.split('\n') if s.strip()]:
-                subtask_data = {
-                    "id": self.get_next_task_id(),
-                    "text": subtask_text,
-                    "completed": False,
-                    "hidden": False,
-                    "created_at": current_time,
-                    "updated_at": current_time
-                }
-                new_subtasks.append(subtask_data)
+            subtask_lines = [line.strip() for line in subtasks_text.split('\n') if line.strip()]
             
-            # 合并有子任务和子任务
-            updated_subtasks = existing_subtasks + new_subtasks if existing_subtasks else new_subtasks
-            
-            # 更新数据和显示
-            for task in self.tasks_data["tasks"]:
-                if task["id"] == task_id:
-                    task["subtasks"] = updated_subtasks
-                    task["updated_at"] = current_time
-                    break
+            # 添加新的子任务
+            for line in subtask_lines:
+                if line:
+                    subtask_id = self.get_next_subtask_id(task_id)
+                    subtask_data = {
+                        "id": subtask_id,
+                        "text": line,
+                        "completed": False,
+                        "hidden": False,
+                        "created_at": current_time,
+                        "updated_at": current_time
+                    }
+                    
+                    # 添加到主任务的子任务列表中
+                    for task in self.tasks_data["tasks"]:
+                        if task["id"] == task_id:
+                            task["subtasks"].append(subtask_data)
+                            task["updated_at"] = current_time
+                            break
             
             # 保存并更新显示
             self.save_tasks()
@@ -648,11 +644,31 @@ class AITodoApp(QMainWindow):
                 self.next_task_id = max(self.next_task_id, task_id + 1)
     
     def get_next_task_id(self):
-        """获取下一个可用的任务ID"""
+        """获取下一个主任务ID"""
+        # 获取所有主任务的ID
+        task_ids = [task["id"] for task in self.tasks_data["tasks"]]
+        if task_ids:
+            self.next_task_id = max(task_ids) + 1
         current_id = self.next_task_id
         self.next_task_id += 1
         return current_id
-    
+
+    def get_next_subtask_id(self, task_id):
+        """获取指定主任务下的下一个子任务ID"""
+        # 找到当前主任务
+        for task in self.tasks_data["tasks"]:
+            if task["id"] == task_id:
+                # 获取所有未隐藏的子任务ID
+                subtask_ids = [subtask["id"] for subtask in task.get("subtasks", [])]
+                # 如果没有子任务，从1开始
+                if not subtask_ids:
+                    return f"{task_id}-1"
+                # 获取最后一个子任务的编号
+                last_id = max([int(sid.split('-')[1]) for sid in subtask_ids])
+                # 返回下一个编号
+                return f"{task_id}-{last_id + 1}"
+        return f"{task_id}-1"  # 如果找不到主任务，从1开始
+
     def get_current_time(self):
         """获取当前时间的格式化字符串"""
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -668,7 +684,9 @@ class AITodoApp(QMainWindow):
             return
             
         current_time = self.get_current_time()
-        subtask_id = self.get_next_task_id()
+        task_widget = self.task_list.itemWidget(self.current_task)
+        task_id = task_widget.task_id
+        subtask_id = self.get_next_subtask_id(task_id)
         
         # 创建新的子任务数据
         subtask_data = {
@@ -681,8 +699,6 @@ class AITodoApp(QMainWindow):
         }
         
         # 添加到主任务的子任务列表中
-        task_widget = self.task_list.itemWidget(self.current_task)
-        task_id = task_widget.task_id
         for task in self.tasks_data["tasks"]:
             if task["id"] == task_id:
                 task["subtasks"].append(subtask_data)
